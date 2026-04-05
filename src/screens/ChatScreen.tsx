@@ -130,17 +130,24 @@ export default function ChatScreen() {
       let gotFirstToken = false;
       const allMessages = useChatStore.getState().messages;
 
-      const fullText = await LLMService.chat(allMessages, (token) => {
-        if (!gotFirstToken) {
-          gotFirstToken = true;
-          setChatPhase('streaming');
-        }
-        appendStreamingToken(token);
-      });
+      let fullText = '';
+      try {
+        fullText = await LLMService.chat(allMessages, (token) => {
+          if (!gotFirstToken) {
+            gotFirstToken = true;
+            setChatPhase('streaming');
+          }
+          appendStreamingToken(token);
+        });
+      } catch (chatErr: any) {
+        // Context may have been released (e.g. app backgrounded).
+        // Salvage whatever was streamed so the user doesn't lose the partial response.
+        console.warn('[ChatScreen] Chat interrupted:', chatErr);
+      }
 
       // Use fullText from LLM, or fall back to what was streamed
       const streamedSoFar = useChatStore.getState().streamingText.trim();
-      const finalText = fullText.trim() || streamedSoFar;
+      const finalText = (fullText || '').trim() || streamedSoFar;
 
       setIsGenerating(false);
       clearStreamingText();
@@ -153,9 +160,20 @@ export default function ChatScreen() {
       }
     } catch (err: any) {
       console.warn('[ChatScreen] Generation error:', err);
+      // Salvage any partial streamed text on unexpected errors
+      const partial = useChatStore.getState().streamingText.trim();
       setIsGenerating(false);
       clearStreamingText();
       setChatPhase('idle');
+
+      if (partial && currentConversation) {
+        try {
+          const aiMsg = await ChatRepository.addMessage(
+            currentConversation.id, 'assistant', partial,
+          );
+          addMessage(aiMsg);
+        } catch {}
+      }
     }
   };
 

@@ -1,22 +1,25 @@
-export const MODEL_FILENAME = 'gemma-4-E2B-it-Q4_K_M.gguf';
+export const MODEL_FILENAME = 'gemma-4-E2B-it-Q3_K_M.gguf';
 
 export const MODEL_URL =
-  'https://huggingface.co/unsloth/gemma-4-E2B-it-GGUF/resolve/main/gemma-4-E2B-it-Q4_K_M.gguf';
+  'https://huggingface.co/unsloth/gemma-4-E2B-it-GGUF/resolve/main/gemma-4-E2B-it-Q3_K_M.gguf';
 
-export const MODEL_SIZE_MB = 3110;
+export const MODEL_SIZE_MB = 2540;
 
 export const LLM_CONFIG = {
-  n_ctx: 4096,
-  n_batch: 512,
-  n_threads: 4,
-  n_gpu_layers: 0,
+  n_ctx: 2048,
+  n_batch: 1024,
+  n_threads: 6,
   use_mlock: true,
+  flash_attn_type: 'auto' as const,
+  cache_type_k: 'q8_0' as const,
+  cache_type_v: 'q8_0' as const,
 } as const;
 
 export const CHAT_CONFIG = {
   temperature: 0.7,
   top_p: 0.9,
-  max_tokens: 1024,
+  top_k: 30,
+  max_tokens: 512,
   stop: ['<turn|>'],
   maxContextMessages: 8,
 } as const;

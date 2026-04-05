@@ -11,3 +11,11 @@
 
 # llama.rn native bindings
 -keep class com.rnllama.** { *; }
+
+# Background downloader (MMKV dependency)
+-keep class com.tencent.mmkv.** { *; }
+-dontwarn com.tencent.mmkv.**
+
+# Background downloader
+-keep class com.eko.** { *; }
+-dontwarn com.eko.**

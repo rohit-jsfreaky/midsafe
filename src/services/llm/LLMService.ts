@@ -1,7 +1,6 @@
 import { AppState, AppStateStatus } from 'react-native';
 import {
   initLlama,
-  releaseAllLlama,
   LlamaContext,
   type RNLlamaOAICompatibleMessage,
   type TokenData,
@@ -51,6 +50,9 @@ class LLMService {
   private idleTimer: ReturnType<typeof setTimeout> | null = null;
   private static readonly IDLE_TIMEOUT_MS = 5 * 60 * 1000;
 
+  /** True while a chat/complete call is in progress. */
+  public isGenerating: boolean = false;
+
   get status(): ModelStatus {
     return this._status;
   }
@@ -87,8 +89,11 @@ class LLMService {
           n_ctx: LLM_CONFIG.n_ctx,
           n_batch: LLM_CONFIG.n_batch,
           n_threads: LLM_CONFIG.n_threads,
-          n_gpu_layers: LLM_CONFIG.n_gpu_layers,
+          n_gpu_layers: 0,
           use_mlock: LLM_CONFIG.use_mlock,
+          flash_attn_type: LLM_CONFIG.flash_attn_type,
+          cache_type_k: LLM_CONFIG.cache_type_k,
+          cache_type_v: LLM_CONFIG.cache_type_v,
         },
         onProgress,
       );
@@ -120,30 +125,36 @@ class LLMService {
     }
 
     this.resetIdleTimer();
+    this.isGenerating = true;
 
-    const formattedMessages = ConversationManager.buildChatContext(
-      messages,
-      systemPrompt,
-    );
+    try {
+      const formattedMessages = ConversationManager.buildChatContext(
+        messages,
+        systemPrompt,
+      );
 
-    const result = await this.context.completion(
-      {
-        messages: formattedMessages,
-        temperature: CHAT_CONFIG.temperature,
-        top_p: CHAT_CONFIG.top_p,
-        n_predict: CHAT_CONFIG.max_tokens,
-        stop: [...CHAT_CONFIG.stop],
-        enable_thinking: false,
-      },
-      (data: TokenData) => {
-        if (data.token) {
-          onToken(data.token);
-        }
-      },
-    );
+      const result = await this.context.completion(
+        {
+          messages: formattedMessages,
+          temperature: CHAT_CONFIG.temperature,
+          top_p: CHAT_CONFIG.top_p,
+          top_k: CHAT_CONFIG.top_k,
+          n_predict: CHAT_CONFIG.max_tokens,
+          stop: [...CHAT_CONFIG.stop],
+          enable_thinking: false,
+        },
+        (data: TokenData) => {
+          if (data.token) {
+            onToken(data.token);
+          }
+        },
+      );
 
-    this.resetIdleTimer();
-    return extractFinalAnswer(result.text);
+      this.resetIdleTimer();
+      return extractFinalAnswer(result.text);
+    } finally {
+      this.isGenerating = false;
+    }
   }
 
   /**
@@ -160,30 +171,36 @@ class LLMService {
     }
 
     this.resetIdleTimer();
+    this.isGenerating = true;
 
-    const messages = ConversationManager.buildOneShotContext(
-      systemPrompt,
-      userMessage,
-    );
+    try {
+      const messages = ConversationManager.buildOneShotContext(
+        systemPrompt,
+        userMessage,
+      );
 
-    const result = await this.context.completion(
-      {
-        messages,
-        temperature: CHAT_CONFIG.temperature,
-        top_p: CHAT_CONFIG.top_p,
-        n_predict: 512,
-        stop: [...CHAT_CONFIG.stop],
-        enable_thinking: false,
-      },
-      onToken
-        ? (data: TokenData) => {
-            if (data.token) onToken(data.token);
-          }
-        : undefined,
-    );
+      const result = await this.context.completion(
+        {
+          messages,
+          temperature: CHAT_CONFIG.temperature,
+          top_p: CHAT_CONFIG.top_p,
+          top_k: CHAT_CONFIG.top_k,
+          n_predict: 256,
+          stop: [...CHAT_CONFIG.stop],
+          enable_thinking: false,
+        },
+        onToken
+          ? (data: TokenData) => {
+              if (data.token) onToken(data.token);
+            }
+          : undefined,
+      );
 
-    this.resetIdleTimer();
-    return extractFinalAnswer(result.text);
+      this.resetIdleTimer();
+      return extractFinalAnswer(result.text);
+    } finally {
+      this.isGenerating = false;
+    }
   }
 
   async stopCompletion(): Promise<void> {
@@ -230,6 +247,10 @@ class LLMService {
 
   private handleAppStateChange = async (nextState: AppStateStatus) => {
     if (nextState === 'background' || nextState === 'inactive') {
+      if (this.isGenerating) {
+        console.log('[LLMService] App backgrounded — skipping release (generation in progress)');
+        return;
+      }
       if (this.context) {
         console.log('[LLMService] App backgrounded — releasing model context');
         await this.release();

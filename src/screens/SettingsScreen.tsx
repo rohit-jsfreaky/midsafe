@@ -77,7 +77,7 @@ export default function SettingsScreen() {
   const handleDeleteModel = () => {
     Alert.alert(
       'Delete AI Model?',
-      'You will need to re-download 3.1 GB to use AI features again.',
+      'You will need to re-download 2.5 GB to use AI features again.',
       [
         { text: 'Cancel', style: 'cancel' },
         {

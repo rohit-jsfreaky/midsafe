@@ -5,6 +5,8 @@ import {
   StyleSheet,
   Pressable,
   Dimensions,
+  Platform,
+  PermissionsAndroid,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -56,6 +58,14 @@ export default function OnboardingScreen() {
       const alreadyDownloaded = await isModelDownloaded();
 
       if (!alreadyDownloaded) {
+        // Request POST_NOTIFICATIONS permission on Android 13+ so the
+        // background-download progress notification can be displayed.
+        if (Platform.OS === 'android' && Platform.Version >= 33) {
+          await PermissionsAndroid.request(
+            PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
+          );
+        }
+
         setIsDownloading(true);
         setModelStatus('downloading');
 
@@ -136,7 +146,7 @@ export default function OnboardingScreen() {
 
           <View style={styles.footerTextContainer}>
             <Text style={styles.footerMono}>
-              A 3.1 GB AI MODEL WILL BE DOWNLOADED OVER WIFI
+              A 2.5 GB AI MODEL WILL BE DOWNLOADED OVER WIFI
             </Text>
             <Text style={styles.footerRegular}>No account required</Text>
           </View>

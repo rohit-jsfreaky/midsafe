@@ -22,7 +22,7 @@ export default function LoadingModel({
   onRetry,
 }: LoadingModelProps) {
   const clampedProgress = Math.min(Math.max(progress, 0), 100);
-  const downloadedMB = Math.round((clampedProgress / 100) * 3110);
+  const downloadedMB = Math.round((clampedProgress / 100) * 2540);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -67,7 +67,7 @@ export default function LoadingModel({
                 {clampedProgress}%
               </Text>
               <Text style={styles.progressSize}>
-                {downloadedMB} / 3,110 MB
+                {downloadedMB} / 2,540 MB
               </Text>
             </View>
           </View>
